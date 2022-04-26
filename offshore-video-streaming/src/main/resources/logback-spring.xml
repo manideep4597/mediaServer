@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<include
+		resource="org/springframework/boot/logging/logback/defaults.xml" />
+
+	<springProfile name="default">
+		<include
+			resource="org/springframework/boot/logging/logback/console-appender.xml" />
+
+		<root level="INFO">
+			<appender-ref ref="CONSOLE" />
+		</root>
+	</springProfile>
+
+	<springProfile name="prod">
+
+		<appender name="FILE-ROLLING"
+			class="ch.qos.logback.core.rolling.RollingFileAppender">
+			<file>logs/MEDIA_PLUGIN.log</file>
+
+			<rollingPolicy
+				class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+				<fileNamePattern>logs/archived/VIDEO_PLUGIN_%d{yyyy_MM_dd}_%i.log
+				</fileNamePattern>
+				<!-- each archived file, size max 10MB -->
+				<maxFileSize>10MB</maxFileSize>
+				<!-- total size of all archive files, if total size > 20GB, it will delete 
+					old archived file -->
+				<totalSizeCap>20GB</totalSizeCap>
+				<!-- 60 days to keep -->
+				<maxHistory>60</maxHistory>
+			</rollingPolicy>
+
+			<encoder>
+				<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %p %c{1.} [%t] %m%n</pattern>
+			</encoder>
+		</appender>
+		<appender name="STDOUT"
+			class="ch.qos.logback.core.ConsoleAppender">
+			<encoder>
+				<pattern>%d{dd-MM-yyyy HH:mm:ss.SSS} %p %c{1.} [%t] %m%n</pattern>
+			</encoder>
+		</appender>
+		<logger name="org.springframework" level="INFO" />
+		<logger name="com.oi" level="DEBUG" />
+		<root level="INFO">
+			<appender-ref ref="FILE-ROLLING" />
+			<appender-ref ref="STDOUT" />
+		</root>
+	</springProfile>
+	
+	<springProfile name="qa">
+
+		<appender name="FILE-ROLLING"
+			class="ch.qos.logback.core.rolling.RollingFileAppender">
+			<file>logs-qa/MEDIA_PLUGIN.log</file>
+
+			<rollingPolicy
+				class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+				<fileNamePattern>logs-qa/archived/VIDEO_PLUGIN_%d{yyyy_MM_dd}_%i.log
+				</fileNamePattern>
+				<!-- each archived file, size max 10MB -->
+				<maxFileSize>10MB</maxFileSize>
+				<!-- total size of all archive files, if total size > 20GB, it will delete 
+					old archived file -->
+				<totalSizeCap>20GB</totalSizeCap>
+				<!-- 60 days to keep -->
+				<maxHistory>60</maxHistory>
+			</rollingPolicy>
+
+			<encoder>
+				<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %p %c{1.} [%t] %m%n</pattern>
+			</encoder>
+		</appender>
+		<appender name="STDOUT"
+			class="ch.qos.logback.core.ConsoleAppender">
+			<encoder>
+				<pattern>%d{dd-MM-yyyy HH:mm:ss.SSS} %p %c{1.} [%t] %m%n</pattern>
+			</encoder>
+		</appender>
+		<logger name="org.springframework" level="INFO" />
+		<logger name="com.oi" level="DEBUG" />
+		<root level="INFO">
+			<appender-ref ref="FILE-ROLLING" />
+			<appender-ref ref="STDOUT" />
+		</root>
+	</springProfile>
+</configuration>
