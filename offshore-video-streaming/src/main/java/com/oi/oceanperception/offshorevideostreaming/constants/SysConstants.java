@@ -45,4 +45,29 @@ public final class SysConstants {
 
     /** The user dir. */
     public static final String USER_DIR = "user.dir";
+
+    public static final String DEFAULT_RTMP_PORT = "1935";
+
+    /** The Constant DEFAULT_APP_NAME_STREAM. */
+    public static final String DEFAULT_APP_NAME_STREAM = "app";
+
+    /** The Constant DEFAULT_STREAM_URL. */
+    public static final String DEFAULT_STREAM_URL = "localhost";
+
+
+    /** The Constant DEFAULT_RTMP_URL_START. */
+    public static final String DEFAULT_RTMP_URL_START = "rtmp://";
+
+    /** The Constant CODEC_FFMPEG_QUERY. */
+    public static final String CODEC_FFMPEG_QUERY = "h264";
+
+    /** The Constant BITRATE_FFMPEG. */
+    public static final String BITRATE_FFMPEG = "1M";
+
+    /** The Constant MAX_BITRATE_FFMPEG. */
+    public static final String MAX_BITRATE_FFMPEG = "2M";
+
+    /** The Constant BUFF_SIXE_FFMPEG. */
+    public static final String BUFF_SIXE_FFMPEG = "1M";
+
 }

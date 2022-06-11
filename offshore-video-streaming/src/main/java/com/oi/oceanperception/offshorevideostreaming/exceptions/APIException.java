@@ -1,19 +1,14 @@
-/**
- * Copyright (c) OCEANEERING INTERNATIONAL, Inc. 2021 - 2025 All Rights Reserved
- * <p>
- * This file contains confidential and proprietary information. Any use of this code, including 
- * reproduction, modification, distribution or republication, without the prior written consent
- * of OCEANEERING INTERNATIONAL, Inc., is strictly prohibited.
- */
 package com.oi.oceanperception.offshorevideostreaming.exceptions;
 
-/**
- * The Class OpRestServiceException.
- */
-public class OpRestServiceException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class APIException extends RuntimeException {
 
     /** The Constant serialVersionUID. */
     private static final long serialVersionUID = -7292396996678999851L;
+
+    /** The status. */
+    private HttpStatus status;
 
     /** The message. */
     private String message;
@@ -21,9 +16,11 @@ public class OpRestServiceException extends RuntimeException {
     /**
      * Instantiates a new OPAPI exception.
      *
+     * @param status  the status
      * @param message the message
      */
-    public OpRestServiceException(String message) {
+    public APIException(HttpStatus status, String message) {
+        this.status = status;
         this.message = message;
     }
 
@@ -33,8 +30,17 @@ public class OpRestServiceException extends RuntimeException {
      * @param message the message
      * @param cause   the cause
      */
-    public OpRestServiceException(String message, Throwable cause) {
+    public APIException(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    /**
+     * Gets the status.
+     *
+     * @return the status
+     */
+    public HttpStatus getStatus() {
+        return status;
     }
 
     /**

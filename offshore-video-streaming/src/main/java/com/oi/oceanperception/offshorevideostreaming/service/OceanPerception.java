@@ -7,39 +7,23 @@
  */
 package com.oi.oceanperception.offshorevideostreaming.service;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.oi.oceanperception.offshorevideostreaming.constants.SysConstants;
+import com.oi.oceanperception.offshorevideostreaming.entity.Stream;
+import com.oi.oceanperception.offshorevideostreaming.enums.StreamStatus;
+import com.oi.oceanperception.offshorevideostreaming.repository.StreamRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.event.ContextClosedEvent;
-import org.springframework.context.event.EventListener;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.oi.oceanperception.offshorevideostreaming.constants.OPConstants;
-import com.oi.oceanperception.offshorevideostreaming.data.AuthRequest;
-import com.oi.oceanperception.offshorevideostreaming.data.AuthResponse;
-import com.oi.oceanperception.offshorevideostreaming.data.StreamDetails;
-import com.oi.oceanperception.offshorevideostreaming.exceptions.OpRestServiceException;
-import com.oi.oceanperception.offshorevideostreaming.uitls.OpThread;
+import javax.annotation.PreDestroy;
 
 /**
  * The Class OceanPerception.
@@ -50,223 +34,131 @@ public class OceanPerception {
     /** The Constant Log. */
     private static final Logger Log = LoggerFactory.getLogger(OceanPerception.class);
 
-    /** The auth response. */
-    private AuthResponse authResponse;
+    /** The stream repository. */
+    @Autowired
+    private StreamRepository streamRepository;
 
-    /** The Instance url. */
-    @Value("${op.rest.services.instance.url}")
-    private String InstanceUrl;
+    /** The rtmp port. */
+    @Value("${op.offshore.ovm.rtmp.port}")
+    private Integer rtmpPort;
 
-    /** The username. */
-    @Value("${op.rest.services.username}")
-    private String username;
-
-    /** The password. */
-    @Value("${op.rest.services.password}")
-    private String password;
-
-    /** The rest template. */
-    private RestTemplate restTemplate;
+    /** The logs folder. */
+    @Value("${op.offshore.logs.folder.path}")
+    private String logsFolder;
 
     /** The stream thread map. */
-    private ConcurrentHashMap<Integer, Long> streamThreadMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Long, OpThread> streamThreadMap = new ConcurrentHashMap<>();
 
     /** The accepted status. */
-    private final HashSet<String> acceptedStatus = new HashSet<String>() {
-        {
-            add("ACTIVE");
-            add("INACTIVE");
-            add("EXCEPTION");
-        }
-    };
-
-    @EventListener(ContextClosedEvent.class)
-    public void onContextClosedEvent(ContextClosedEvent contextClosedEvent) {
-        Set<Thread> setOfThread = Thread.getAllStackTraces().keySet();
-        for (Thread thread : setOfThread) {
-            if (streamThreadMap.containsValue(thread.getId())) {
-                thread.interrupt();
-
-            }
-        }
+    private static final HashSet<String> acceptedStatus = new HashSet<String>();
+    static {
+        acceptedStatus.add(StreamStatus.INACTIVE.toString());
+        acceptedStatus.add(StreamStatus.EXCEPTION.toString());
     }
 
     /**
-     * Creates the object mapper.
+     * Gets the rtmp port.
      *
-     * @return the object mapper
+     * @return the rtmp port
      */
-    private ObjectMapper createObjectMapper() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
-
-        return objectMapper;
+    public String getRtmpPort() {
+        return Objects.isNull(rtmpPort) || rtmpPort <= 0 ? SysConstants.DEFAULT_RTMP_PORT : rtmpPort.toString();
     }
 
     /**
-     * Gets the rest template.
+     * Gets the logs folder.
      *
-     * @return the rest template
+     * @return the logs folder
      */
-    private RestTemplate getRestTemplate() {
-        if (Objects.isNull(restTemplate)) {
-            restTemplate = new RestTemplate();
-            restTemplate.getMessageConverters().add(0, createMappingJacksonHttpMessageConverter());
-        }
-        return restTemplate;
+    public String getLogsFolder() {
+        return logsFolder;
     }
 
     /**
-     * Creates the mapping jackson http message converter.
-     *
-     * @return the mapping jackson 2 http message converter
+     * On op closed event.
      */
-    private MappingJackson2HttpMessageConverter createMappingJacksonHttpMessageConverter() {
-
-        MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-        converter.setObjectMapper(createObjectMapper());
-        return converter;
-    }
-
-    /**
-     * Authorize.
-     *
-     * @return the auth response
-     */
-    public AuthResponse authorize() {
-        restTemplate = new RestTemplate();
-        AuthRequest authRequest = new AuthRequest();
-        authRequest.setPassword(password);
-        authRequest.setUsernameOrEmail(username);
-        String url = InstanceUrl + OPConstants.OP_AUTH_PATH;
-        HttpEntity<AuthRequest> entity = new HttpEntity<>(authRequest, getHttpHeaders());
-        authResponse = restTemplate.exchange(url, HttpMethod.POST, entity, AuthResponse.class).getBody();
-        return authResponse;
-    }
-
-    /**
-     * Gets the http headers with token.
-     *
-     * @return the http headers with token
-     */
-    public HttpHeaders getHttpHeadersWithToken() {
-        HttpHeaders headers = new HttpHeaders();
-        if (Objects.isNull(authResponse)) {
-            authorize();
-        }
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        headers.setBearerAuth(authResponse.getAccessToken());
-        return headers;
-    }
-
-    /**
-     * Gets the http headers.
-     *
-     * @return the http headers
-     */
-    public HttpHeaders getHttpHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        return headers;
-    }
-
-    /**
-     * Update streams.
-     *
-     * @param streamDetails the stream details
-     */
-    public void updateStreams(StreamDetails streamDetails) {
-        HttpEntity<StreamDetails> entity = new HttpEntity<>(streamDetails, getHttpHeadersWithToken());
-        String url = InstanceUrl + OPConstants.OP_UPDATE_STREAM + streamDetails.getId();
-        ResponseEntity<StreamDetails> response;
-        try {
-            response = restTemplate.exchange(url, HttpMethod.PUT, entity, StreamDetails.class);
-            if (response.getStatusCode().equals(HttpStatus.OK)) {
-                Log.debug("Stream with Id {} got Updated with Status {}", streamDetails.getId(),
-                        streamDetails.getStreamStatus());
-            } else {
-                Log.error("Stream with Id {} got Exception while updating", streamDetails.getId());
-                throw new OpRestServiceException(
-                        String.format("Stream with Id %s got Exception while updating", streamDetails.getId()));
-            }
-        } catch (RestClientResponseException e) {
-            if (e.getRawStatusCode() == HttpStatus.UNAUTHORIZED.value()) {
-                authorize();
-                entity = new HttpEntity<>(getHttpHeadersWithToken());
-                response = restTemplate.exchange(url, HttpMethod.PUT, entity, StreamDetails.class);
-                if (response.getStatusCode().equals(HttpStatus.OK)) {
-                    Log.debug("Stream with Id {} got Updated with Status {}", streamDetails.getId(),
-                            streamDetails.getStreamStatus());
-                } else {
-                    Log.error("Stream with Id {} got Exception while updating", streamDetails.getId());
-                    throw new OpRestServiceException(
-                            String.format("Stream with Id %s got Exception while updating", streamDetails.getId()));
-                }
-            } else {
-                Log.error(e.toString());
-                throw new RuntimeException(e.toString());
-            }
-        }
+    @PreDestroy()
+    public void onOpClosedEvent() {
+        List<Stream> streamList = streamRepository.findAllById(streamThreadMap.keySet());
+        streamList.stream().forEach(stream -> {
+            stream.setStreamStatus(StreamStatus.INACTIVE);
+            stream.setComments("Server Stopped, Streams will  be UP after Restart");
+        });
+        streamRepository.saveAll(streamList);
 
     }
 
     /**
      * Do streaming frequently.
      *
-     * @throws Exception the exception
      */
-    @Scheduled(fixedDelayString = "${op.streams.refresh.milliseconds}")
-    public void doStreamingFrequently() throws Exception {
-        HttpEntity<Void> entity = new HttpEntity<>(getHttpHeadersWithToken());
-        String url = InstanceUrl + OPConstants.OP_GET_ALL_STREAMS;
-        ResponseEntity<StreamDetails[]> response;
-        try {
-            response = restTemplate.exchange(url, HttpMethod.GET, entity, StreamDetails[].class);
-            if (response.getStatusCode().equals(HttpStatus.OK)) {
-                Log.debug("Get All Streams from OP Rest Service");
-            } else {
-                Log.error(" Exception while fetching Streams from OP Rest Service");
-                throw new OpRestServiceException(" Exception while fetching Streams from OP Rest Service");
-            }
-        } catch (RestClientResponseException e) {
-            if (e.getRawStatusCode() == HttpStatus.UNAUTHORIZED.value()) {
-                authorize();
-                entity = new HttpEntity<>(getHttpHeadersWithToken());
-                response = this.restTemplate.postForEntity(url, entity, StreamDetails[].class);
-                if (response.getStatusCode().equals(HttpStatus.OK)) {
-                    Log.debug("Get All Streams from OP Rest Service");
-                } else {
-                    Log.error(" Exception while fetching Streams from OP Rest Service");
-                    throw new OpRestServiceException(" Exception while fetching Streams from OP Rest Service");
-                }
-            } else {
-                throw new OpRestServiceException(e.toString());
-            }
-        }
-
-        List<StreamDetails> streamDetailsList = Arrays.asList(response.getBody());
+    @Scheduled(fixedDelayString = "60000")
+    public void doStreamingFrequently() {
+        List<Stream> streamDetailsList = streamRepository.findAll();
         streamDetailsList.forEach(streamDetails -> {
-            if (acceptedStatus.contains(streamDetails.getStreamStatus())) {
-                if (!streamDetails.getStreamStatus().equals("ACTIVE")) {
+
+            if (! validateStreamDetails(streamDetails)) {
+                streamDetails.setStreamStatus(StreamStatus.EXCEPTION);
+                streamDetails.setComments("Stream Data was NULL / Not Acceptable");
+                streamRepository.save(streamDetails);
+            }
+            if (streamThreadMap.containsKey(streamDetails.getStreamId())) {
+                if (acceptedStatus.contains(streamDetails.getStreamStatus().toString()) ) {
+                    if (Objects.nonNull(streamThreadMap.get(streamDetails.getStreamId()))) {
+                        streamThreadMap.get(streamDetails.getStreamId()).stop();
+                    }
+                    streamThreadMap.remove(streamDetails.getStreamId());
                     OpThread opThread = new OpThread(streamDetails, this);
                     opThread.start();
-                    streamThreadMap.put(streamDetails.getId(), opThread.getThreadId());
+                    streamThreadMap.put(streamDetails.getStreamId(), opThread);
                 }
-            } else {
-                if (streamThreadMap.containsKey(streamDetails.getId())) {
-                    Set<Thread> setOfThread = Thread.getAllStackTraces().keySet();
-                    for (Thread thread : setOfThread) {
-                        if (thread.getId() == streamThreadMap.get(streamDetails.getId())) {
-                            thread.interrupt();
-                            streamThreadMap.remove(streamDetails.getId());
-                        }
-                    }
+            }
+            else {
+                if (acceptedStatus.contains(streamDetails.getStreamStatus().toString()) ) {
+                    OpThread opThread = new OpThread(streamDetails, this);
+                    opThread.start();
+                    streamThreadMap.put(streamDetails.getStreamId(), opThread);
                 }
             }
         });
 
     }
 
+    /**
+     * Update streams.
+     *
+     * @param stream the stream
+     */
+    public void updateStreams(Stream stream) {
+        streamRepository.save(stream);
+    }
+
+    /**
+     * Update thread list.
+     *
+     * @param stream the stream
+     */
+    public void updateThreadList(Stream stream) {
+        if (streamThreadMap.containsKey(stream.getStreamId())) {
+            streamThreadMap.remove(stream.getStreamId());
+        }
+    }
+
+    /**
+     * Validate stream details.
+     *
+     * @param streamDetails the stream details
+     * @return the boolean
+     */
+    private Boolean validateStreamDetails(Stream streamDetails) {
+        if (Objects.isNull(streamDetails.getStreamName()) || Objects.isNull(streamDetails.getStreamApplicationName())
+                || Objects.isNull(streamDetails.getStreamRtspUrl())) {
+            return Boolean.FALSE;
+        }
+        if (streamDetails.getStreamName().equals("") || streamDetails.getStreamRtspUrl().equals("")
+                || streamDetails.getStreamApplicationName().equals("")) {
+            return Boolean.FALSE;
+        }
+        return Boolean.TRUE;
+    }
 }
